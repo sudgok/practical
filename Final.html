@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final lab tutorial</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for a clean, focused writing experience */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc; /* Very light blue/gray background */
+        }
+        .container {
+            min-height: 100vh;
+        }
+        .editor { /* Changed #editor to .editor for multiple elements */
+            min-height: 40vh; /* Slightly smaller height for 30 pages */
+            outline: none;
+            cursor: text;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        /* Style for the placeholder text */
+        [contenteditable="true"]:empty:before {
+            content: "Click here and start typing...";
+            color: #9ca3af; /* Gray-400 */
+            font-style: italic;
+            pointer-events: none; /* Allows click-through */
+            display: block; /* For correct alignment */
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="max-w-4xl mx-auto container">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold text-gray-800">Final-LAB 📑</h1>
+            <p class="text-base text-gray-500 mt-2">
+                <h2>Copy safely either we all get ban or susupend .</h2>
+            </p>
+        </header>
+        
+        <div id="pages-container">
+            </div>
+
+    </div>
+
+    <script>
+        // --- Dynamic Multi-Page Local Storage and Copy Implementation ---
+        
+        const NUMBER_OF_PAGES = 30;
+        const container = document.getElementById('pages-container');
+
+        // Debounce utility (reused)
+        function debounce(func, delay) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
+
+        // Function to save content for a specific page
+        const saveContent = debounce((key, content) => {
+            localStorage.setItem(key, content);
+            // console.log(`Content for ${key} saved.`);
+        }, 500); 
+        
+        // Function to copy content for a specific page
+        function copyContent(pageId) {
+            const editor = document.getElementById(`editor-${pageId}`);
+            const copyButton = document.getElementById(`copy-button-${pageId}`);
+            const copyTextSpan = copyButton.querySelector('.copy-text-span');
+
+            const contentToCopy = editor.innerText; 
+
+            // Use the modern Clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(contentToCopy)
+                    .then(() => {
+                        // Success Feedback
+                        copyTextSpan.textContent = 'Copied!';
+                        copyButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                        copyButton.classList.add('bg-green-600', 'hover:bg-green-700');
+                        
+                        setTimeout(() => {
+                            copyTextSpan.textContent = 'Copy Content';
+                            copyButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+                            copyButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Modern copy failed:', err);
+                        copyTextSpan.textContent = 'Copy Failed';
+                    });
+            } else {
+                // Fallback (omitted for brevity in this general-purpose script, but remember it's good practice)
+                copyTextSpan.textContent = 'Copy Failed (Browser not supported)';
+            }
+        }
+        
+        // Function to generate the HTML structure for a single page
+        function createPageHTML(id) {
+            return `
+                <hr class="my-10 border-gray-300">
+                <div class="mb-12 p-6 bg-white rounded-xl shadow-lg border-t-4 border-indigo-500" id="page-wrapper-${id}">
+                    <h2 class="text-2xl font-bold mb-4 text-indigo-700">Page ${id}</h2>
+                    
+                    <div class="flex justify-end mb-4">
+                        <button id="copy-button-${id}" class="copy-button-class px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 text-sm font-semibold flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            <span class="copy-text-span">Copy Content</span>
+                        </button>
+                    </div>
+
+                    <div id="editor-${id}" 
+                        contenteditable="true" 
+                        class="editor w-full p-8 sm:p-12 bg-gray-50 rounded-lg text-lg leading-relaxed text-gray-800 focus:ring-4 focus:ring-indigo-200 transition duration-150"
+                        role="textbox"
+                        aria-multiline="true"
+                        tabindex="0"
+                    >
+                    </div>
+                </div>
+            `;
+        }
+
+        // Initialize and attach listeners for all pages
+        function initializePages() {
+            let allPagesHTML = '';
+            
+            // 1. Generate HTML for all 30 pages
+            for (let i = 1; i <= NUMBER_OF_PAGES; i++) {
+                allPagesHTML += createPageHTML(i);
+            }
+            container.innerHTML = allPagesHTML;
+            
+            // 2. Load content and attach listeners
+            for (let i = 1; i <= NUMBER_OF_PAGES; i++) {
+                const pageId = i;
+                const editor = document.getElementById(`editor-${pageId}`);
+                const copyButton = document.getElementById(`copy-button-${pageId}`);
+                const storageKey = `minimalEditorContentPage${pageId}`;
+                
+                // Load content from Local Storage
+                const savedContent = localStorage.getItem(storageKey);
+                if (savedContent) {
+                    editor.innerHTML = savedContent;
+                } else {
+                    // Set default content if nothing is saved
+                    editor.innerHTML = `<h2>Page ${pageId} Heading</h2><p>Start writing for Page ${pageId} here. This saves automatically!</p>`;
+                }
+
+                // Attach Save Listener
+                editor.addEventListener('input', () => {
+                    saveContent(storageKey, editor.innerHTML);
+                });
+                
+                // Attach Copy Listener
+                copyButton.addEventListener('click', () => copyContent(pageId));
+            }
+        }
+        
+        // Start the application setup on window load
+        window.onload = initializePages;
+
+    </script>
+</body>
+</html>
