@@ -34,9 +34,9 @@
 
     <div class="max-w-4xl mx-auto container">
         <header class="text-center mb-10">
-            <h1 class="text-4xl font-extrabold text-gray-800">Final-LAB 📑</h1>
+            <h1 class="text-4xl font-extrabold text-gray-800">Final-LAB 📑 (ONLINE SAVE ENABLED)</h1>
             <p class="text-base text-gray-500 mt-2">
-                <h2>Copy safely either we all get ban or susupend .</h2>
+                <h2>Content now saves to the server, visible to everyone. **You must set up a server for this to work.**</h2>
             </p>
         </header>
         
@@ -46,10 +46,13 @@
     </div>
 
     <script>
-        // --- Dynamic Multi-Page Local Storage and Copy Implementation ---
+        // --- Dynamic Multi-Page Online Storage and Copy Implementation ---
         
         const NUMBER_OF_PAGES = 30;
         const container = document.getElementById('pages-container');
+
+        // *** IMPORTANT: You MUST change this URL to your actual backend server endpoint ***
+        const BASE_API_URL = 'https://lab-saver.com/api/pages';
 
         // Debounce utility (reused)
         function debounce(func, delay) {
@@ -60,13 +63,37 @@
             };
         }
 
-        // Function to save content for a specific page
-        const saveContent = debounce((key, content) => {
-            localStorage.setItem(key, content);
-            // console.log(`Content for ${key} saved.`);
-        }, 500); 
+        // Function to save content for a specific page (Saves ONLINE)
+        const saveContent = debounce((pageId, content) => {
+            const data = {
+                page_id: pageId, // Send the page number
+                content: content // Send the editor's HTML content
+            };
+            
+            // Perform the network request to save data
+            fetch(BASE_API_URL, {
+                method: 'POST', // Use POST to create/update data on the server
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                // Optional: Display success message or log
+                // console.log(`Page ${pageId} saved successfully online!`);
+            })
+            .catch(error => {
+                console.error(`Error saving Page ${pageId} online:`, error);
+                // In a real app, you would show an error message to the user
+            });
+
+        }, 1500); // 1.5 seconds debounce to reduce frequent server requests
+
         
-        // Function to copy content for a specific page
+        // Function to copy content (remains the same)
         function copyContent(pageId) {
             const editor = document.getElementById(`editor-${pageId}`);
             const copyButton = document.getElementById(`copy-button-${pageId}`);
@@ -99,7 +126,7 @@
             }
         }
         
-        // Function to generate the HTML structure for a single page
+        // Function to generate the HTML structure for a single page (remains the same)
         function createPageHTML(id) {
             return `
                 <hr class="my-10 border-gray-300">
@@ -125,35 +152,53 @@
             `;
         }
 
-        // Initialize and attach listeners for all pages
-        function initializePages() {
+        // Initialize and attach listeners for all pages (Loads ONLINE)
+        async function initializePages() {
             let allPagesHTML = '';
             
-            // 1. Generate HTML for all 30 pages
+            // 1. Generate HTML structure for all 30 pages
             for (let i = 1; i <= NUMBER_OF_PAGES; i++) {
                 allPagesHTML += createPageHTML(i);
             }
             container.innerHTML = allPagesHTML;
             
-            // 2. Load content and attach listeners
+            // 2. Fetch all saved content from the server
+            let contentMap = {};
+            try {
+                // GET request to fetch all pages data
+                const response = await fetch(BASE_API_URL); 
+                if (response.ok) {
+                    const savedPages = await response.json();
+                    // Convert array [{page_id: 1, content: '...'}, ...] to a map {1: 'content', ...}
+                    contentMap = savedPages.reduce((map, page) => {
+                        map[page.page_id] = page.content;
+                        return map;
+                    }, {});
+                }
+            } catch (error) {
+                console.error('Error fetching initial content from server. The content will not be collaborative.', error);
+                // Fallback: editors will show default/placeholder content
+            }
+
+            // 3. Populate editors and attach listeners
             for (let i = 1; i <= NUMBER_OF_PAGES; i++) {
                 const pageId = i;
                 const editor = document.getElementById(`editor-${pageId}`);
                 const copyButton = document.getElementById(`copy-button-${pageId}`);
-                const storageKey = `minimalEditorContentPage${pageId}`;
                 
-                // Load content from Local Storage
-                const savedContent = localStorage.getItem(storageKey);
+                // ** ONLINE LOAD LOGIC **
+                const savedContent = contentMap[pageId]; 
                 if (savedContent) {
                     editor.innerHTML = savedContent;
                 } else {
-                    // Set default content if nothing is saved
+                    // Set default content if nothing is saved online
                     editor.innerHTML = `<h2>Page ${pageId} Heading</h2><p>Start writing for Page ${pageId} here. This saves automatically!</p>`;
                 }
 
-                // Attach Save Listener
+                // ** ONLINE SAVE LOGIC **
                 editor.addEventListener('input', () => {
-                    saveContent(storageKey, editor.innerHTML);
+                    // Pass the numeric pageId and the HTML content to the server save function
+                    saveContent(pageId, editor.innerHTML);
                 });
                 
                 // Attach Copy Listener
